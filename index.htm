@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skin Tone Analyzer PRO</title>
+
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:linear-gradient(180deg,#0b0f14,#111827);
+    color:white;
+    text-align:center;
+}
+
+header{
+    padding:20px;
+}
+
+.card{
+    max-width:900px;
+    margin:auto;
+    background:#0f172a;
+    padding:20px;
+    border-radius:16px;
+    box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+
+input{
+    margin:15px;
+}
+
+canvas{
+    width:100%;
+    border-radius:12px;
+}
+
+.result{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:10px;
+    margin-top:20px;
+}
+
+.box{
+    background:#111c33;
+    padding:12px;
+    border-radius:12px;
+}
+
+.color{
+    width:120px;
+    height:120px;
+    margin:auto;
+    border-radius:12px;
+    border:2px solid white;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>🔥 Skin Tone Analyzer PRO (Online)</h2>
+<p>ارفع صورة وجهك وسيتم تحليل لون البشرة تلقائياً</p>
+</header>
+
+<div class="card">
+
+<input type="file" id="upload" accept="image/*">
+
+<canvas id="canvas"></canvas>
+
+<div class="result">
+    <div class="box">
+        <div class="color" id="colorBox"></div>
+    </div>
+
+    <div class="box">
+        <h3>HEX / RGB</h3>
+        <p id="rgb"></p>
+    </div>
+
+    <div class="box">
+        <h3>درجة البشرة</h3>
+        <p id="tone"></p>
+    </div>
+
+    <div class="box">
+        <h3>Undertone</h3>
+        <p id="undertone"></p>
+    </div>
+</div>
+
+</div>
+
+<script>
+const upload = document.getElementById('upload');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+
+Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+]).then(()=>console.log("models loaded"));
+
+upload.addEventListener('change', async () => {
+    const file = upload.files[0];
+    if(!file) return;
+
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+
+    img.onload = async () => {
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        ctx.drawImage(img,0,0);
+
+        const detection = await faceapi
+            .detectSingleFace(img,new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks();
+
+        if(!detection){
+            alert("ما تم العثور على وجه 😅");
+            return;
+        }
+
+        const box = detection.detection.box;
+
+        // 🎯 أخذ منطقة الخدود فقط
+        const x = box.x + box.width*0.2;
+        const y = box.y + box.height*0.5;
+        const w = box.width*0.6;
+        const h = box.height*0.3;
+
+        const data = ctx.getImageData(x,y,w,h).data;
+
+        let r=0,g=0,b=0,count=0;
+
+        for(let i=0;i<data.length;i+=4){
+            r+=data[i];
+            g+=data[i+1];
+            b+=data[i+2];
+            count++;
+        }
+
+        r=Math.floor(r/count);
+        g=Math.floor(g/count);
+        b=Math.floor(b/count);
+
+        const hex = "#" + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+
+        // brightness
+        const bright = (r+g+b)/3;
+
+        let tone = bright>200?"فاتح":bright>140?"متوسط":"داكن";
+
+        let undertone =
+            r>b+10 ? "دافئ 🔥" :
+            b>r+10 ? "بارد ❄️" :
+            "محايد";
+
+        document.getElementById("colorBox").style.background = hex;
+        document.getElementById("rgb").innerText = `RGB(${r},${g},${b}) | ${hex}`;
+        document.getElementById("tone").innerText = tone;
+        document.getElementById("undertone").innerText = undertone;
+    }
+});
+</script>
+
+</body>
+</html>
